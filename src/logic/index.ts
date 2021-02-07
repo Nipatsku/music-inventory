@@ -2,9 +2,8 @@
 import { Connection, MoreThan } from 'typeorm'
 import ArtistEntity from '../entity/Artist'
 import AlbumEntity from '../entity/Album'
-import TrackEntity from '../entity/Track'
-import { getUserAllPlaylistsTracks, getArtistsFromTracks, getArtistAlbums, getAlbumTracks, playTrack } from '../spotify/utils'
-import Artist from '../entity/Artist'
+import TrackEntity, { TrackRating } from '../entity/Track'
+import { getUserAllPlaylistsTracks, getArtistsFromTracks, getArtistAlbums, getAlbumTracks, playTrack, SpotifyTrack } from '../spotify/utils'
 
 export const doStuff = async ( auth, Database: Connection ) => {
     const ArtistRepository = Database.getRepository( ArtistEntity )
@@ -39,13 +38,11 @@ export const doStuff = async ( auth, Database: Connection ) => {
     const tracks = await TrackRepository.find()
     console.log(`${tracks.length} tracks`)
 
-    const {
-        approxTracksCount,
-        approxTracksDurationMs
-    } = await approximateTargetTracksStats( auth, Database )
-    console.log(`Approx target tracks count: ${approxTracksCount} (${parseDurationMs(approxTracksDurationMs)})`)
-
-    await playUnratedTrack(auth, Database)
+    // const {
+    //     approxTracksCount,
+    //     approxTracksDurationMs
+    // } = await approximateTargetTracksStats( auth, Database )
+    // console.log(`Approx target tracks count: ${approxTracksCount} (${parseDurationMs(approxTracksDurationMs)})`)
 
 }
 
@@ -65,8 +62,8 @@ export const approximateTargetTracksStats = async ( auth, Database: Connection )
     // Iterate through every album in database.
     for (const album of albums) {
         if (album.tracksListed) {
-            // Album tracks have been scraped, so we know the exact amount of tracks it has.
-            approxTracksCount += album.tracksCount
+            // Album tracks have been scraped. Count unrated tracks count.
+            approxTracksCount += (album.tracksCount - album.ratedTracksCount)
         } else {
             // Album tracks have NOT been scraped, just go with some rough average assumption.
             const assumedTracksCount = 10
@@ -137,15 +134,55 @@ export const playUnratedTrack = async (auth, Database: Connection) => {
     // Mark track played.
     track.playedTimestamp = Date.now()
     await TrackRepository.save(track)
+
+    return track
 }
 
 export const getRecentlyPlayedTracks = async (auth, Database: Connection): Promise<TrackEntity[]> => {
     const TrackRepository = Database.getRepository(TrackEntity)
     return TrackRepository.find({
+        relations: ['artist'],
         where: {
             playedTimestamp: MoreThan( Date.now() - 30 * minuteMs )
+        },
+        order: {
+            playedTimestamp: 'DESC',
         }
     })
+}
+
+export const rateTrack = async (auth, Database: Connection, trackId: number, rating: string) => {
+    const TrackRepository = Database.getRepository(TrackEntity)
+    const AlbumRepository = Database.getRepository(AlbumEntity)
+
+    const track = await TrackRepository.findOne(trackId, {relations: ['album', 'artist']})
+    const wasUnratedBefore = track.rated === false
+    track.rating = rating
+    track.rated = true
+    console.log(`\tNew rating: ${track.name} by ${track.artist.name} = ${rating}`)
+    await TrackRepository.save(track)
+
+    if (wasUnratedBefore) {
+        // Update Album rated tracks count.
+        const album = track.album
+        album.ratedTracksCount ++
+        album.allTracksRated = album.ratedTracksCount >= album.tracksCount
+        console.log(`\t\tAlbum ${album.name} ratedTracksCount: ${album.ratedTracksCount} allTrackRated: ${album.allTracksRated}`)
+        await AlbumRepository.save(album)
+    }
+
+    // Play next track automatically if rating suggests so.
+    const shouldPlayNextTrack = [
+        TrackRating.nope,
+        TrackRating.unrated,
+        TrackRating.maybeAnotherTime,
+        TrackRating.mediocre,
+    ].includes(rating)
+
+    if (shouldPlayNextTrack) {
+        console.log(`\t\tPlaying next track automatically`)
+        await playUnratedTrack(auth, Database)
+    }
 }
 
 const secondMs = 1000

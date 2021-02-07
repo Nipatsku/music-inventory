@@ -27,6 +27,9 @@ export default class Album {
     @Column({ nullable: true })
     tracksDurationMs: number
 
+    @Column({ default: 0 })
+    ratedTracksCount: number
+
     @Column({ default: false })
     allTracksRated: boolean
 

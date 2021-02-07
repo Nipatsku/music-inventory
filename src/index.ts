@@ -7,7 +7,9 @@ import * as request from 'request-promise-native'
 import { createConnection } from 'typeorm'
 import { IUserActivePlayback, IUserProfile } from './interfaces';
 import { User } from './entity/User';
-import { doStuff } from './logic';
+import { doStuff, getRecentlyPlayedTracks, playUnratedTrack, rateTrack } from './logic';
+import Track, { TrackRating } from './entity/Track';
+import { getUserCurrentPlayback } from './spotify/utils';
 
 
 let BACKEND_URL
@@ -199,43 +201,91 @@ const getUserProfile = async ( auth ) => {
     
     doStuff( auth, Database )
 
+    app.get('/play-unrated', async function(req, res) {
+        await playUnratedTrack(auth, Database)
+        res.redirect(`${BACKEND_URL}/rate`)
+    })
 
-    // app.get('/', async function(req, res) {
-    //     // Read User from query parameter.
-    //     const user = await userFromQuery( req, res )
-    //     let auth = user.getAuth()
-    //     try {
-    //         // Refresh access token automatically always.
-    //         auth = await refreshAccessTokens( user.refresh_token )
-    //     } catch (e) {
-    //         console.error(`\t\trefresh error`, e.message)
-    //     }
-    //     // Read active playback.
-    //     const playback = await getUserActivePlayback( auth )
-    //     if ( playback ) {
-    //         // Send track name + artist.
-    //         const name = playback.item.name
-    //         const artist = playback.item.artists[0].name
-    //         res.send({
-    //             name,
-    //             artist
-    //         })
-    //     } else {
-    //         res.send(undefined)
-    //     }
-    // })
+    // TODO: Automatically add more unrated songs into queue? How to best manage this..?
+    // Maybe via front end ..?
 
-
-    const userFromQuery = async ( req: Request, res: Response ): Promise<User> => {
-        try {
-            const userId = req.url.match(/id=([^&/]*)/)[1]
-            const user = await UserRepository.findOne({ where: { id: userId } })
-            if ( ! user ) throw new Error(`User not found: ${ userId }`)
-            return user
-        } catch ( e ) {
-            res.send(`:(`)
-            throw e
+    app.get('/rate', async function(req, res) {
+        const recentlyPlayedTracks = await getRecentlyPlayedTracks(auth, Database)
+        const track = recentlyPlayedTracks[0]
+        if (!track) {
+            return res.send('No recently played tracks.')
         }
-    }
+        const ratingKeys = Object.keys(TrackRating)
+        const ratingLabels = ratingKeys.map(key => TrackRating[key])
+        res.send(`<html><head>
+            <style>
+                body {
+                    font-size: 1.0vw;
+                }
+                .column {
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    height: 100%;
+                }
+                .title {
+                    font-size: 3.0vw;
+                }
+                .button {
+                    font-size: 6.0vh;
+                    text-decoration: none;
+                    color: white;
+                    background-color: black;
+                    border-radius: 10px;
+                    padding: 0px 5px;
+                    margin: 5px;
+                    text-align: center;
+                }
+                .button:hover {
+                    cursor: pointer;
+                    opacity: 0.6;
+                }
+            </style>
+        </head><body>
+            <div class='column'>
+            <span class='title'>Please select your rating of <b>${track.name}</b> by ${track.artist.name}</span>
+            ${ratingLabels.map( (rating, i) =>
+                `<a class='button' href=${`${BACKEND_URL}/rate-redirect?trackId=${track.id}&rating=${ratingKeys[i]}`}>${rating}</a>`
+            ).join('\n')}
+            <br/>
+            </div>
+        </body></html>`)
+    })
+
+    app.get('/rate-redirect', async function(req, res) {
+        try {
+            const trackId = req.url.match(/trackId=([^&/]*)/)[1]
+            const rating = TrackRating[req.url.match(/rating=([^&/]*)/)[1]]
+            await rateTrack(auth, Database, trackId, rating)
+            res.redirect(`${BACKEND_URL}/rate-wait-for-song-to-end?trackId=${trackId}`)
+        } catch (e) {
+            console.error(`/rate-redirect | Unhandled error ${e.message}`)
+            res.send('An error occured, the rating was not saved :(')
+        }
+    })
+
+    app.get('/rate-wait-for-song-to-end', async function(req, res) {
+        const trackId = req.url.match(/trackId=([^&/]*)/)[1]
+        // Check if song is over.
+        const currentPlayback = await getUserCurrentPlayback(auth)
+        if (! currentPlayback || currentPlayback.id !== trackId) {
+            // Redirect to rating.
+            return res.redirect(`${BACKEND_URL}/rate`)
+        }
+        // Schedule next recheck.
+        res.send(`<html><body>
+            <h1>Waiting for song to end...</h1>
+            <script>
+                setTimeout(() => {
+                    window.location.reload()
+                }, 1000)
+            </script>
+        </body></html>`)
+    })
 
 })()

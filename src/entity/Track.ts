@@ -42,10 +42,10 @@ export default class Track {
 }
 
 export const TrackRating = {
-    unrated: 'unrated',
-    nope: 'NOPE',
-    maybeAnotherTime: 'maybe',
-    absolutely: 'absolutely',
+    awesome: 'AWESOME!',
     good: 'good',
-    mediocre: 'mediocre'
+    mediocre: 'mediocre',
+    nope: 'NOPE',
+    maybeAnotherTime: 'maybe another time',
+    unrated: 'unrated'
 }

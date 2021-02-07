@@ -325,6 +325,23 @@ export const playTrack = async (auth, trackUri: string) => {
         console.error(`playTrack | unhandled error | ${e.message}`)
     }
 }
+export const getUserCurrentPlayback = async (auth) => {
+    const { access_token } = auth
+    // GET https://api.spotify.com/v1/me/player
+    const response = JSON.parse(await request({
+        method: 'GET',
+        uri: `https://api.spotify.com/v1/me/player/`,
+        headers: {
+            Authorization: `Bearer ${ access_token }`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+    }))
+    if (response.currently_playing_type !== 'track') {
+        return undefined
+    }
+    const track = response.item as SpotifyTrack
+    return track
+}
 
 export interface SpotifyPlaylist {
     description: string
