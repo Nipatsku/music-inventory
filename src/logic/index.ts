@@ -1,5 +1,5 @@
 
-import { Connection } from 'typeorm'
+import { Connection, MoreThan } from 'typeorm'
 import ArtistEntity from '../entity/Artist'
 import AlbumEntity from '../entity/Album'
 import TrackEntity from '../entity/Track'
@@ -28,7 +28,7 @@ export const doStuff = async ( auth, Database: Connection ) => {
     //  a) approximates amount of targeted songs
     //  b) Has Exclude/Include artists functionality.
     //  c) Can play you a song.
-
+    //  d) You can rate recently played songs.
 
     const artists = await ArtistRepository.find()
     console.log(`${artists.length} artists`)
@@ -46,6 +46,7 @@ export const doStuff = async ( auth, Database: Connection ) => {
     console.log(`Approx target tracks count: ${approxTracksCount} (${parseDurationMs(approxTracksDurationMs)})`)
 
     await playUnratedTrack(auth, Database)
+
 }
 
 // #region ----- Main functions -----
@@ -55,7 +56,7 @@ export const doStuff = async ( auth, Database: Connection ) => {
  * 
  * + some other statistics, like total duration.
  */
-const approximateTargetTracksStats = async ( auth, Database: Connection ) => {
+export const approximateTargetTracksStats = async ( auth, Database: Connection ) => {
     // Ensure albums up to date.
     const albums = await updateAlbums(auth, Database)
 
@@ -80,7 +81,7 @@ const approximateTargetTracksStats = async ( auth, Database: Connection ) => {
     }
 }
 
-const getRandomUnratedTracks = async (auth, Database: Connection, count: number): Promise<TrackEntity[]> => {
+export const getRandomUnratedTracks = async (auth, Database: Connection, count: number): Promise<TrackEntity[]> => {
     const AlbumRepository = Database.getRepository( AlbumEntity )
 
     // Assume albums up to date.
@@ -125,12 +126,26 @@ const getRandomUnratedTracks = async (auth, Database: Connection, count: number)
 /**
  * Starts playing any unrated track.
  */
-const playUnratedTrack = async (auth, Database: Connection) => {
+export const playUnratedTrack = async (auth, Database: Connection) => {
+    const TrackRepository = Database.getRepository(TrackEntity)
+
     const track = (await getRandomUnratedTracks(auth, Database, 1))[0]
     if (! track) return
     console.log(`Playing ${track.name} by ${track.artist.name}`)
 
     await playTrack(auth, track.uri)
+    // Mark track played.
+    track.playedTimestamp = Date.now()
+    await TrackRepository.save(track)
+}
+
+export const getRecentlyPlayedTracks = async (auth, Database: Connection): Promise<TrackEntity[]> => {
+    const TrackRepository = Database.getRepository(TrackEntity)
+    return TrackRepository.find({
+        where: {
+            playedTimestamp: MoreThan( Date.now() - 30 * minuteMs )
+        }
+    })
 }
 
 const secondMs = 1000

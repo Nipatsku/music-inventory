@@ -24,10 +24,28 @@ export default class Track {
     @Column({ default: false })
     rated: boolean
 
+    /**
+     * Should be one of TrackRating enum
+     */
+    @Column({ nullable: true })
+    rating: string
+
+    @Column({ nullable: true })
+    playedTimestamp: number
+
     @ManyToOne(type => Album, album => album.tracks)
     album: Album;
 
     @ManyToOne(type => Artist, artist => artist.tracks)
     artist: Artist;
 
+}
+
+export const TrackRating = {
+    unrated: 'unrated',
+    nope: 'NOPE',
+    maybeAnotherTime: 'maybe',
+    absolutely: 'absolutely',
+    good: 'good',
+    mediocre: 'mediocre'
 }
