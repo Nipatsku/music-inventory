@@ -1,7 +1,7 @@
 {
   "name": "music-inventory",
   "version": "1.0.0",
-  "description": "",
+  "description": "Legendary project with the goal of finding ALL songs I like",
   "main": "index.js",
   "scripts": {
     "create-db": "sqlite3 db.sqlite save db.sqlite .exit",
