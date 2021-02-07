@@ -12,3 +12,4 @@ report.*
 artists.json
 tracks.json
 git-commit-msg-spotify*
+db.sqlite*

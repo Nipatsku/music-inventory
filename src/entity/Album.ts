@@ -28,7 +28,7 @@ export default class Album {
     tracksDurationMs: number
 
     @Column({ default: false })
-    allTracksListed: boolean
+    allTracksRated: boolean
 
     @ManyToOne(type => Artist, artist => artist.albums)
     artist: Artist;
