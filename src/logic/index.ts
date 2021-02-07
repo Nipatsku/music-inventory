@@ -3,7 +3,7 @@ import { Connection } from 'typeorm'
 import ArtistEntity from '../entity/Artist'
 import AlbumEntity from '../entity/Album'
 import TrackEntity from '../entity/Track'
-import { getUserAllPlaylistsTracks, getArtistsFromTracks, getArtistAlbums, getAlbumTracks } from '../spotify/utils'
+import { getUserAllPlaylistsTracks, getArtistsFromTracks, getArtistAlbums, getAlbumTracks, playTrack } from '../spotify/utils'
 import Artist from '../entity/Artist'
 
 export const doStuff = async ( auth, Database: Connection ) => {
@@ -81,9 +81,7 @@ const approximateTargetTracksStats = async ( auth, Database: Connection ) => {
 }
 
 const getRandomUnratedTracks = async (auth, Database: Connection, count: number): Promise<TrackEntity[]> => {
-    const ArtistRepository = Database.getRepository( ArtistEntity )
     const AlbumRepository = Database.getRepository( AlbumEntity )
-    const TrackRepository = Database.getRepository( TrackEntity )
 
     // Assume albums up to date.
     
@@ -132,6 +130,7 @@ const playUnratedTrack = async (auth, Database: Connection) => {
     if (! track) return
     console.log(`Playing ${track.name} by ${track.artist.name}`)
 
+    await playTrack(auth, track.uri)
 }
 
 const secondMs = 1000

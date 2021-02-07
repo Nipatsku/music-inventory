@@ -92,50 +92,6 @@ const getUserProfile = async ( auth ) => {
     ) as IUserProfile
 }
 
-const getUserActivePlayback = async ( auth ) => {
-    const { access_token } = auth
-    const response = await request({
-        method: 'GET',
-        uri: 'https://api.spotify.com/v1/me/player',
-        headers: {
-            Authorization: `Bearer ${ access_token }`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-    })
-    return response && response.length > 0 ?
-        JSON.parse(
-            response
-        ) as IUserActivePlayback :
-        undefined
-}
-
-/**
- * @param auth 
- * @param volume [0, 100]
- */
-const setUserVolume = async ( auth, volume ) => {
-    const { access_token } = auth
-    volume = Math.round( Math.min(Math.max( volume, 0 ), 100) )
-    try {
-        const response = await request({
-            method: 'PUT',
-            uri: `https://api.spotify.com/v1/me/player/volume?volume_percent=${ volume }`,
-            headers: {
-                Authorization: `Bearer ${ access_token }`,
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        })
-    } catch ( e ) {
-        console.error(`ERROR setUserVolume: ${ e.message }`)
-        if ( 'message' in e ) {
-            console.error(e.message)
-            if ( 'data' in e.message ) {
-                console.error(e.message.data)
-            }
-        }
-    }
-}
-
 //#endregion
 
 ;(async () => {
