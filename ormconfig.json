@@ -1,0 +1,18 @@
+{
+   "environment": "development",
+   "name": "development",
+   "type": "sqlite",
+   "database": "db.sqlite",
+   "synchronize": true,
+   "logging": false,
+   "entities": [
+      "src/entity/**/*.ts"
+   ],
+   "subscribers": [
+      "src/subscriber/**/*.ts"
+   ],
+   "migrations": ["migration/*.js"],
+   "cli": {
+      "migrationsDir": "migration"
+   }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "music-inventory",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "create-db": "sqlite3 db.sqlite save db.sqlite .exit",
+    "dev": "ts-node-dev --respawn --ignore-watch node_modules src/index.ts",
+    "build": "rm -rf ./build && tsc"
+  },
+  "author": "Niilo Keinänen",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "reflect-metadata": "^0.1.10",
+    "request": "^2.88.2",
+    "request-promise-native": "^1.0.9",
+    "sqlite3": "^4.0.3",
+    "typeorm": "0.2.26"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.7",
+    "ts-node": "3.3.0",
+    "ts-node-dev": "^1.1.1",
+    "typescript": "3.3.3333"
+  }
+}
