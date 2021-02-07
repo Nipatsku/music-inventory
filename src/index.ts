@@ -218,9 +218,18 @@ const getUserProfile = async ( auth ) => {
         const ratingKeys = Object.keys(TrackRating)
         const ratingLabels = ratingKeys.map(key => TrackRating[key])
         res.send(`<html><head>
+            <title>Music Inventory - menu</title>
             <style>
                 body {
-                    font-size: 1.0vw;
+                    overflow: hidden;
+                }
+                a {
+                    text-decoration: none;
+                    color: white;
+                    background-color: black;
+                    border-radius: 10px;
+                    padding: 0px 5px;
+                    margin: 5px;
                 }
                 .column {
                     display: flex;
@@ -229,21 +238,21 @@ const getUserProfile = async ( auth ) => {
                     height: 100%;
                 }
                 .title {
-                    font-size: 3.0vw;
+                    font-size: 2.0vw;
                 }
                 .button {
                     font-size: 6.0vh;
-                    text-decoration: none;
-                    color: white;
-                    background-color: black;
-                    border-radius: 10px;
-                    padding: 0px 5px;
-                    margin: 5px;
                     text-align: center;
                 }
                 .button:hover {
                     cursor: pointer;
                     opacity: 0.6;
+                }
+                .button-next {
+                    font-size: 4.0vh;
+                    position: fixed;
+                    top: 0;
+                    right: 0;
                 }
             </style>
         </head><body>
@@ -254,6 +263,7 @@ const getUserProfile = async ( auth ) => {
             ).join('\n')}
             <br/>
             </div>
+            <a class='button-next' href=${BACKEND_URL}/play-unrated>Next track<a/>
         </body></html>`)
     })
 
@@ -261,15 +271,16 @@ const getUserProfile = async ( auth ) => {
         try {
             const trackId = req.url.match(/trackId=([^&/]*)/)[1]
             const rating = TrackRating[req.url.match(/rating=([^&/]*)/)[1]]
+            console.log('debug rate-redirect', 'trackId:',trackId,'rating:', rating)
             await rateTrack(auth, Database, trackId, rating)
-            res.redirect(`${BACKEND_URL}/rate-wait-for-song-to-end?trackId=${trackId}`)
+            res.redirect(`${BACKEND_URL}/rate-wait?trackId=${trackId}`)
         } catch (e) {
             console.error(`/rate-redirect | Unhandled error ${e.message}`)
             res.send('An error occured, the rating was not saved :(')
         }
     })
 
-    app.get('/rate-wait-for-song-to-end', async function(req, res) {
+    app.get('/rate-wait', async function(req, res) {
         const trackId = req.url.match(/trackId=([^&/]*)/)[1]
         // Check if song is over.
         const currentPlayback = await getUserCurrentPlayback(auth)
@@ -278,12 +289,13 @@ const getUserProfile = async ( auth ) => {
             return res.redirect(`${BACKEND_URL}/rate`)
         }
         // Schedule next recheck.
-        res.send(`<html><body>
-            <h1>Waiting for song to end...</h1>
+        res.send(`<html><head><title>Music Inventory - listening to ${currentPlayback.artists[0].name}</title></head><body>
+            <h1>Now listening to <b>${currentPlayback.name}</b> by ${currentPlayback.artists[0].name}</h1>
+            <a href=${BACKEND_URL}/play-unrated style='font-size: 2.0em'>Skip<a/>
             <script>
                 setTimeout(() => {
                     window.location.reload()
-                }, 1000)
+                }, 3000)
             </script>
         </body></html>`)
     })

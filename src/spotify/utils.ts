@@ -247,83 +247,55 @@ const getAllArtistsTracks = async (auth, artists: SpotifyArtist[]) => {
 }
 export const playTrack = async (auth, trackUri: string) => {
     const { access_token } = auth
-    try {
-        // POST https://api.spotify.com/v1/me/player/queue
-        let response = await request({
-            method: 'POST',
-            uri: `https://api.spotify.com/v1/me/player/queue?uri=${ trackUri }`,
-            headers: {
-                Authorization: `Bearer ${ access_token }`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            resolveWithFullResponse: true
-        })
-        let statusCode = response.statusCode
-        if (statusCode !== 204) {
-            throw new Error(`playTrack | received unexpected statusCode when adding track to queue | statusCode: ${statusCode} trackUri: ${trackUri}`)
-        }
 
-        // Skip items in queue until the requested track is active.
-        let currentlyPlayingTrack: SpotifyTrack
-        let skippedTracks = 0
-        do {
-            if (currentlyPlayingTrack) {
-                // Skip to next track in queue.
-                response = await request({
-                    method: 'POST',
-                    uri: `https://api.spotify.com/v1/me/player/next`,
-                    headers: {
-                        Authorization: `Bearer ${ access_token }`,
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    },
-                    resolveWithFullResponse: true
-                })
-                statusCode = response.statusCode
-                if (statusCode !== 204) {
-                    // Request failed. Don't throw an error, but stop the operation with a warning.
-                    console.warn(`\tplayTrack | unexpected statusCode while skipping to requested track in queue | ${statusCode}`)
-                    console.warn(`\tstopping queue skipping`)
-                    return
-                }
-                skippedTracks ++
-            }
+    /**
+     * TODO: Should be acquired during login and so on.
+     */
+    const TEMP_PLAYLIST = '5sfVal7459RWClfmHNpCiC'
 
-            // GET https://api.spotify.com/v1/me/player/currently-playing
-            let attempts = 0
-            while (true) {
-                attempts ++
-                response = JSON.parse(await request({
-                    method: 'GET',
-                    uri: `https://api.spotify.com/v1/me/player/currently-playing`,
-                    headers: {
-                        Authorization: `Bearer ${ access_token }`,
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    }
-                }))
-                const updatedCurrentlyPlayingTrack = response.item as SpotifyTrack
-                if (! currentlyPlayingTrack || (
-                    currentlyPlayingTrack.id !== updatedCurrentlyPlayingTrack.id
-                    // TODO: Might bug out if queue has two duplicate songs in a row
-                )) {
-                    currentlyPlayingTrack = updatedCurrentlyPlayingTrack
-                    break
-                }
-                if (attempts > 10) {
-                    console.warn(`\tplayTrack | couldn't confirm track skip after ${attempts} attempts`)
-                    break
-                }
-            }
-        } while (currentlyPlayingTrack.uri !== trackUri)
-
-        if (skippedTracks > 0) {
-            console.log(`\tSkipped ${skippedTracks} tracks. Now playing ${ currentlyPlayingTrack.name }`)
-        }
-
-    } catch (e) {
-        console.error(`playTrack | unhandled error | ${e.message}`)
+    // Add track to temp playlist.
+    console.log(`\tAdding track to temp playlist ...`)
+    // POST https://api.spotify.com/v1/playlists/{playlist_id}/tracks
+    let response = await request({
+        method: 'POST',
+        uri: `https://api.spotify.com/v1/playlists/${TEMP_PLAYLIST}/tracks?uris=${trackUri}`,
+        headers: {
+            Authorization: `Bearer ${ access_token }`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        resolveWithFullResponse: true
+    })
+    let statusCode = response.statusCode
+    if (statusCode < 200 || statusCode > 204) {
+        // Error!
+        throw new Error(`playTrack | unepected status code when adding song to temp playlist: ${statusCode}`)
     }
+
+    // Play song from temp playlist.
+    console.log(`\tPlacing track to active playback ...`)
+    // PUT https://api.spotify.com/v1/me/player/play
+    response = await request({
+        method: 'PUT',
+        uri: `https://api.spotify.com/v1/me/player/play`,
+        headers: {
+            Authorization: `Bearer ${ access_token }`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        resolveWithFullResponse: true,
+        body: JSON.stringify({
+            context_uri: 'spotify:playlist:'+TEMP_PLAYLIST,
+            offset: {
+                uri: trackUri
+            }
+        })
+    })
+    statusCode = response.statusCode
+    if (statusCode < 200 || statusCode > 204) {
+        // Error!
+        throw new Error(`playTrack | unepected status code when setting playback state: ${statusCode}`)
+    }
+
+    console.log(`\tNow playing ${trackUri}`)
 }
 export const getUserCurrentPlayback = async (auth) => {
     const { access_token } = auth

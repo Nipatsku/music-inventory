@@ -4,6 +4,7 @@ import ArtistEntity from '../entity/Artist'
 import AlbumEntity from '../entity/Album'
 import TrackEntity, { TrackRating } from '../entity/Track'
 import { getUserAllPlaylistsTracks, getArtistsFromTracks, getArtistAlbums, getAlbumTracks, playTrack, SpotifyTrack } from '../spotify/utils'
+import * as request from 'request-promise-native'
 
 export const doStuff = async ( auth, Database: Connection ) => {
     const ArtistRepository = Database.getRepository( ArtistEntity )
@@ -43,6 +44,8 @@ export const doStuff = async ( auth, Database: Connection ) => {
     //     approxTracksDurationMs
     // } = await approximateTargetTracksStats( auth, Database )
     // console.log(`Approx target tracks count: ${approxTracksCount} (${parseDurationMs(approxTracksDurationMs)})`)
+
+
 
 }
 
@@ -143,7 +146,8 @@ export const getRecentlyPlayedTracks = async (auth, Database: Connection): Promi
     return TrackRepository.find({
         relations: ['artist'],
         where: {
-            playedTimestamp: MoreThan( Date.now() - 30 * minuteMs )
+            playedTimestamp: MoreThan( Date.now() - 30 * minuteMs ),
+            rated: false
         },
         order: {
             playedTimestamp: 'DESC',
@@ -159,6 +163,7 @@ export const rateTrack = async (auth, Database: Connection, trackId: number, rat
     const wasUnratedBefore = track.rated === false
     track.rating = rating
     track.rated = true
+    track.ratedTimestamp = Date.now()
     console.log(`\tNew rating: ${track.name} by ${track.artist.name} = ${rating}`)
     await TrackRepository.save(track)
 

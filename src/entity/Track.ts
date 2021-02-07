@@ -24,6 +24,9 @@ export default class Track {
     @Column({ default: false })
     rated: boolean
 
+    @Column({ nullable: true })
+    ratedTimestamp: number
+
     /**
      * Should be one of TrackRating enum
      */
