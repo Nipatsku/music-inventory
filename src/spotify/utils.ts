@@ -295,6 +295,24 @@ export const playTrack = async (auth, trackUri: string) => {
         throw new Error(`playTrack | unepected status code when setting playback state: ${statusCode}`)
     }
 
+    // Confirm playback starts.
+    console.log(`\tConfirming playback starts ...`)
+    const tWaitStart = Date.now()
+    while (true) {
+        const currentPlayback = await getUserCurrentPlayback(auth)
+        if (currentPlayback && currentPlayback.uri === trackUri) {
+            break
+        }
+
+        const tNow = Date.now()
+        if (tNow - tWaitStart > 5000) {
+            console.warn(`\t\tRequested playback didn't start after 5 seconds. Reattempting ...`)
+            return playTrack(auth, trackUri)
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500))
+    }
+
     console.log(`\tNow playing ${trackUri}`)
 }
 export const getUserCurrentPlayback = async (auth) => {

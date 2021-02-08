@@ -198,100 +198,126 @@ const getUserProfile = async ( auth ) => {
     const user = await UserRepository.findOne()
     let auth = user.getAuth()
     auth = await refreshAccessTokens(user.refresh_token)
+    setInterval(async () => {
+        auth = await refreshAccessTokens(user.refresh_token)
+    }, 10 * 60 * 1000)
     
     doStuff( auth, Database )
 
-    app.get('/play-unrated', async function(req, res) {
-        await playUnratedTrack(auth, Database)
-        res.redirect(`${BACKEND_URL}/rate`)
+    app.get('/play', async function(req, res) {
+        const track = await playUnratedTrack(auth, Database)
+        console.log(`Now playing ${track.name} by ${track.artist.name}`)
+        console.log(`Redirecting user to menu`)
+        res.redirect(`${BACKEND_URL}/menu?trackId=${track.id}`)
     })
 
-    // TODO: Automatically add more unrated songs into queue? How to best manage this..?
-    // Maybe via front end ..?
-
-    app.get('/rate', async function(req, res) {
-        const recentlyPlayedTracks = await getRecentlyPlayedTracks(auth, Database)
-        const track = recentlyPlayedTracks[0]
-        if (!track) {
-            return res.send('No recently played tracks.')
-        }
-        const ratingKeys = Object.keys(TrackRating)
-        const ratingLabels = ratingKeys.map(key => TrackRating[key])
-        res.send(`<html><head>
-            <title>Music Inventory - menu</title>
-            <style>
-                body {
-                    overflow: hidden;
-                }
-                a {
-                    text-decoration: none;
-                    color: white;
-                    background-color: black;
-                    border-radius: 10px;
-                    padding: 0px 5px;
-                    margin: 5px;
-                }
-                .column {
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: space-between;
-                    height: 100%;
-                }
-                .title {
-                    font-size: 2.0vw;
-                }
-                .button {
-                    font-size: 6.0vh;
-                    text-align: center;
-                }
-                .button:hover {
-                    cursor: pointer;
-                    opacity: 0.6;
-                }
-                .button-next {
-                    font-size: 4.0vh;
-                    position: fixed;
-                    top: 0;
-                    right: 0;
-                }
-            </style>
-        </head><body>
-            <div class='column'>
-            <span class='title'>Please select your rating of <b>${track.name}</b> by ${track.artist.name}</span>
-            ${ratingLabels.map( (rating, i) =>
-                `<a class='button' href=${`${BACKEND_URL}/rate-redirect?trackId=${track.id}&rating=${ratingKeys[i]}`}>${rating}</a>`
-            ).join('\n')}
-            <br/>
-            </div>
-            <a class='button-next' href=${BACKEND_URL}/play-unrated>Next track<a/>
-        </body></html>`)
-    })
-
-    app.get('/rate-redirect', async function(req, res) {
-        try {
-            const trackId = req.url.match(/trackId=([^&/]*)/)[1]
-            const rating = TrackRating[req.url.match(/rating=([^&/]*)/)[1]]
-            console.log('debug rate-redirect', 'trackId:',trackId,'rating:', rating)
-            await rateTrack(auth, Database, trackId, rating)
-            res.redirect(`${BACKEND_URL}/rate-wait?trackId=${trackId}`)
-        } catch (e) {
-            console.error(`/rate-redirect | Unhandled error ${e.message}`)
-            res.send('An error occured, the rating was not saved :(')
-        }
-    })
-
-    app.get('/rate-wait', async function(req, res) {
+    app.get('/menu', async function(req, res) {
         const trackId = req.url.match(/trackId=([^&/]*)/)[1]
         // Check if song is over.
         const currentPlayback = await getUserCurrentPlayback(auth)
         if (! currentPlayback || currentPlayback.id !== trackId) {
-            // Redirect to rating.
-            return res.redirect(`${BACKEND_URL}/rate`)
+            // Queue next song.
+            return res.redirect(`${BACKEND_URL}/play`)
+        }
+
+        // Get recently played songs for rating.
+        const recentlyPlayedTracks = await getRecentlyPlayedTracks(auth, Database)
+        const ratingKeys = Object.keys(TrackRating)
+        const ratingLabels = ratingKeys.map(key => TrackRating[key])
+        res.send(`<html><head>
+            <title>Music Inventory</title>
+            <style>
+                body {
+                    display: flex;
+                    flex-direction: column;
+                    text-align: center;
+                    overflow-y: auto;
+                }
+                .title-small {
+                    font-size: 8.0vw;
+                }
+                .title-big {
+                    font-size: 10.0vw;
+                }
+                .recently-played {
+                    margin-top: 20vh;
+                    font-size: 6.0vw;
+                }
+                .rate-button {
+                    font-size: 6.0vw;
+                    margin-block-start: 0.5em;
+                    margin-block-end: 0.5em;
+                }
+            </style>
+        </head>
+        <body>
+            <span class='title-small'>Listening to</span>
+            <span class='title-big'><b>${currentPlayback.name}</b></span>
+            <span class='title-small'>by ${currentPlayback.artists[0].name}</span>
+            <span class='recently-played'>Recently played:</span>
+            ${recentlyPlayedTracks.map((track, i) => 
+                `<button class='rate-button' onclick='rate(${i})'>${track.name}</button>`
+            ).join('\n')}
+            <script>
+                let rating = false
+                function rate(iTrack) {
+                    rating = true
+                    const track = [${recentlyPlayedTracks.map(track => `${JSON.stringify({ name: track.name, artist: track.artist.name, id: track.id })}`).join(', ')}][iTrack]
+                    document.body.innerHTML = "<span class='title-small'>Rating <b>"+track.name+"</b> by "+track.artist+"</span>" + ${ratingLabels.map( (rating, i) =>
+                        `"<a class='rate-button' href=${`${BACKEND_URL}/rate-track?trackId="+track.id+"&rating=${ratingKeys[i]}`}>${rating}</a>"`
+                    ).join(' + ')}
+                    setTimeout(() => {
+                        window.location.reload()
+                    }, 10000)
+                }
+                setTimeout(() => {
+                    if (!rating) window.location.reload()
+                }, 3000)
+            </script>
+        </body>
+        </html>
+        `)
+    })
+
+    app.get('/rate-track', async function(req, res) {
+        try {
+            const trackId = req.url.match(/trackId=([^&/]*)/)[1]
+            const rating = TrackRating[req.url.match(/rating=([^&/]*)/)[1]]
+            await rateTrack(auth, Database, trackId, rating)
+
+            // Play next track automatically if rating suggests so.
+            const shouldPlayNextTrack = [
+                TrackRating.nope,
+                TrackRating.unrated,
+                TrackRating.maybeAnotherTime,
+                TrackRating.mediocre,
+            ].includes(rating)
+
+            if (shouldPlayNextTrack) {
+                console.log(`Playing next track automatically`)
+                return res.redirect(`${BACKEND_URL}/play`)
+            } else {
+                // Wait for song to end.
+                return res.redirect(`${BACKEND_URL}/menu-wait?trackId=${trackId}`)
+            }
+        } catch (e) {
+            console.error(`/rate-track | Unhandled error ${e.message}`)
+            res.send('An error occured, the rating was not saved :(')
+        }
+    })
+
+    app.get('/menu-wait', async function(req, res) {
+        const trackId = req.url.match(/trackId=([^&/]*)/)[1]
+        // Check if song is over.
+        const currentPlayback = await getUserCurrentPlayback(auth)
+        if (! currentPlayback || currentPlayback.id !== trackId) {
+            // Queue next song.
+            return res.redirect(`${BACKEND_URL}/play`)
         }
         // Schedule next recheck.
         res.send(`<html><head><title>Music Inventory - listening to ${currentPlayback.artists[0].name}</title></head><body>
             <h1>Now listening to <b>${currentPlayback.name}</b> by ${currentPlayback.artists[0].name}</h1>
-            <a href=${BACKEND_URL}/play-unrated style='font-size: 2.0em'>Skip<a/>
+            <a href=${BACKEND_URL}/play style='font-size: 2.0em'>Skip<a/>
             <script>
                 setTimeout(() => {
                     window.location.reload()

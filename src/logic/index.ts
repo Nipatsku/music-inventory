@@ -39,11 +39,11 @@ export const doStuff = async ( auth, Database: Connection ) => {
     const tracks = await TrackRepository.find()
     console.log(`${tracks.length} tracks`)
 
-    // const {
-    //     approxTracksCount,
-    //     approxTracksDurationMs
-    // } = await approximateTargetTracksStats( auth, Database )
-    // console.log(`Approx target tracks count: ${approxTracksCount} (${parseDurationMs(approxTracksDurationMs)})`)
+    const {
+        approxTracksCount,
+        approxTracksDurationMs
+    } = await approximateTargetTracksStats( auth, Database )
+    console.log(`Approx target tracks count: ${approxTracksCount} (${parseDurationMs(approxTracksDurationMs)})`)
 
 
 
@@ -174,19 +174,6 @@ export const rateTrack = async (auth, Database: Connection, trackId: number, rat
         album.allTracksRated = album.ratedTracksCount >= album.tracksCount
         console.log(`\t\tAlbum ${album.name} ratedTracksCount: ${album.ratedTracksCount} allTrackRated: ${album.allTracksRated}`)
         await AlbumRepository.save(album)
-    }
-
-    // Play next track automatically if rating suggests so.
-    const shouldPlayNextTrack = [
-        TrackRating.nope,
-        TrackRating.unrated,
-        TrackRating.maybeAnotherTime,
-        TrackRating.mediocre,
-    ].includes(rating)
-
-    if (shouldPlayNextTrack) {
-        console.log(`\t\tPlaying next track automatically`)
-        await playUnratedTrack(auth, Database)
     }
 }
 
