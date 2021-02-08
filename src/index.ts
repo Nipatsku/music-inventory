@@ -245,8 +245,10 @@ const getUserProfile = async ( auth ) => {
                 }
                 .rate-button {
                     font-size: 6.0vw;
-                    margin-block-start: 0.5em;
-                    margin-block-end: 0.5em;
+                    background-color: rgba(200,200,200);
+                    padding: 10px 0px;
+                    margin-top: 1.0em;
+                    margin-bottom: 1.0em;
                 }
             </style>
         </head>
@@ -256,7 +258,7 @@ const getUserProfile = async ( auth ) => {
             <span class='title-small'>by ${currentPlayback.artists[0].name}</span>
             <span class='recently-played'>Recently played:</span>
             ${recentlyPlayedTracks.map((track, i) => 
-                `<button class='rate-button' onclick='rate(${i})'>${track.name}</button>`
+                `<span class='rate-button' onclick='rate(${i})'>${track.name}</span>`
             ).join('\n')}
             <script>
                 let rating = false
