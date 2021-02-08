@@ -245,7 +245,7 @@ const getAllArtistsTracks = async (auth, artists: SpotifyArtist[]) => {
     console.log(`\tFound total of ${allTracks.length} tracks`)
     return allTracks
 }
-export const playTrack = async (auth, trackUri: string) => {
+export const playTrack = async (auth, trackUri: string, reattempt: number = 0) => {
     const { access_token } = auth
 
     /**
@@ -253,22 +253,27 @@ export const playTrack = async (auth, trackUri: string) => {
      */
     const TEMP_PLAYLIST = '5sfVal7459RWClfmHNpCiC'
 
-    // Add track to temp playlist.
-    console.log(`\tAdding track to temp playlist ...`)
-    // POST https://api.spotify.com/v1/playlists/{playlist_id}/tracks
-    let response = await request({
-        method: 'POST',
-        uri: `https://api.spotify.com/v1/playlists/${TEMP_PLAYLIST}/tracks?uris=${trackUri}`,
-        headers: {
-            Authorization: `Bearer ${ access_token }`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        resolveWithFullResponse: true
-    })
-    let statusCode = response.statusCode
-    if (statusCode < 200 || statusCode > 204) {
-        // Error!
-        throw new Error(`playTrack | unepected status code when adding song to temp playlist: ${statusCode}`)
+    const TEMP_DEVICE = '4d68f5a85f91a74adc0c85adcc5afae1fe5e26e3'
+
+    let statusCode, response
+    if (reattempt === 0) {
+        // Add track to temp playlist.
+        console.log(`\tAdding track to temp playlist ...`)
+        // POST https://api.spotify.com/v1/playlists/{playlist_id}/tracks
+        response = await request({
+            method: 'POST',
+            uri: `https://api.spotify.com/v1/playlists/${TEMP_PLAYLIST}/tracks?uris=${trackUri}`,
+            headers: {
+                Authorization: `Bearer ${ access_token }`,
+                'Content-Type': 'application/json',
+            },
+            resolveWithFullResponse: true
+        })
+        statusCode = response.statusCode
+        if (statusCode < 200 || statusCode > 204) {
+            // Error!
+            throw new Error(`playTrack | unepected status code when adding song to temp playlist: ${statusCode}`)
+        }
     }
 
     // Play song from temp playlist.
@@ -276,7 +281,7 @@ export const playTrack = async (auth, trackUri: string) => {
     // PUT https://api.spotify.com/v1/me/player/play
     response = await request({
         method: 'PUT',
-        uri: `https://api.spotify.com/v1/me/player/play`,
+        uri: `https://api.spotify.com/v1/me/player/play?device_id=${TEMP_DEVICE}`,
         headers: {
             Authorization: `Bearer ${ access_token }`,
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -306,8 +311,12 @@ export const playTrack = async (auth, trackUri: string) => {
 
         const tNow = Date.now()
         if (tNow - tWaitStart > 5000) {
-            console.warn(`\t\tRequested playback didn't start after 5 seconds. Reattempting ...`)
-            return playTrack(auth, trackUri)
+            console.warn(`\t\tRequested playback didn't start after 5 seconds.`)
+            if (reattempt >= 2) {
+                throw new Error(`\t\tCan't play: ${trackUri}`)
+            }
+            console.log(`\t\t Reattempting (${reattempt + 1}) ...`)
+            return playTrack(auth, trackUri, reattempt + 1)
         }
 
         await new Promise(resolve => setTimeout(resolve, 500))

@@ -1,5 +1,5 @@
 
-import { Connection, MoreThan } from 'typeorm'
+import { Between, Connection, MoreThan } from 'typeorm'
 import ArtistEntity from '../entity/Artist'
 import AlbumEntity from '../entity/Album'
 import TrackEntity, { TrackRating } from '../entity/Track'
@@ -30,33 +30,67 @@ export const doStuff = async ( auth, Database: Connection ) => {
     //  c) Can play you a song.
     //  d) You can rate recently played songs.
 
-    const artists = await ArtistRepository.find()
-    console.log(`${artists.length} artists`)
+    // const artists = await ArtistRepository.find()
+    // console.log(`${artists.length} artists`)
 
-    const albums = await AlbumRepository.find()
-    console.log(`${albums.length} albums`)
+    // const albums = await AlbumRepository.find()
+    // console.log(`${albums.length} albums`)
 
-    const tracks = await TrackRepository.find()
-    console.log(`${tracks.length} tracks`)
+    // const tracks = await TrackRepository.find()
+    // console.log(`${tracks.length} tracks`)
+
+    // const {
+    //     approxTracksCount,
+    //     approxTracksDurationMs
+    // } = await approximateTargetTracksStats( auth, Database )
+    // console.log(`Approx target tracks count: ${approxTracksCount} (${parseDurationMs(approxTracksDurationMs)})`)
+
+}
+
+// #region ----- Main functions -----
+
+export const getStatistics = async (auth, Database: Connection): Promise<{
+    ratedToday: number,
+    ratedTracks: number,
+    unratedTracks: number,
+    unratedTracksDurationMs: number
+}> => {
+    const TrackRepository = Database.getRepository( TrackEntity )
 
     const {
         approxTracksCount,
         approxTracksDurationMs
     } = await approximateTargetTracksStats( auth, Database )
-    console.log(`Approx target tracks count: ${approxTracksCount} (${parseDurationMs(approxTracksDurationMs)})`)
 
+    const ratedTracks = await TrackRepository.count({
+        where: { rated: true }
+    })
 
+    const now = new Date()
+    const ratedToday = await TrackRepository.count({
+        where: {
+            rated: true,
+            ratedTimestamp: Between(
+                new Date( now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0 ),
+                new Date( now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0 ),
+            )
+        }
+    })
 
+    return {
+        ratedTracks,
+        unratedTracks: approxTracksCount,
+        unratedTracksDurationMs: approxTracksDurationMs,
+        ratedToday
+    }
 }
-
-// #region ----- Main functions -----
 
 /**
  * Approximates targeted track count without initiating Tracks scraping (HEAVY).
  * 
  * + some other statistics, like total duration.
  */
-export const approximateTargetTracksStats = async ( auth, Database: Connection ) => {
+const approximateTargetTracksStats = async ( auth, Database: Connection ) => {
     // Ensure albums up to date.
     const albums = await updateAlbums(auth, Database)
 

@@ -7,7 +7,7 @@ import * as request from 'request-promise-native'
 import { createConnection } from 'typeorm'
 import { IUserActivePlayback, IUserProfile } from './interfaces';
 import { User } from './entity/User';
-import { doStuff, getRecentlyPlayedTracks, playUnratedTrack, rateTrack } from './logic';
+import { doStuff, getRecentlyPlayedTracks, getStatistics, playUnratedTrack, rateTrack } from './logic';
 import Track, { TrackRating } from './entity/Track';
 import { getUserCurrentPlayback } from './spotify/utils';
 
@@ -204,11 +204,18 @@ const getUserProfile = async ( auth ) => {
     
     doStuff( auth, Database )
 
+    const stats = await getStatistics(auth, Database)
+    console.log(stats)
+
     app.get('/play', async function(req, res) {
-        const track = await playUnratedTrack(auth, Database)
-        console.log(`Now playing ${track.name} by ${track.artist.name}`)
-        console.log(`Redirecting user to menu`)
-        res.redirect(`${BACKEND_URL}/menu?trackId=${track.id}`)
+        try {    
+            const track = await playUnratedTrack(auth, Database)
+            console.log(`Now playing ${track.name} by ${track.artist.name}`)
+            console.log(`Redirecting user to menu`)
+            res.redirect(`${BACKEND_URL}/menu?trackId=${track.id}`)
+        } catch (e) {
+            console.error(`error: ${e.message}`)
+        }
     })
 
     app.get('/menu', async function(req, res) {
