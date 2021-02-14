@@ -50,5 +50,6 @@ export const TrackRating = {
     mediocre: 'mediocre',
     nope: 'NOPE',
     maybeAnotherTime: 'maybe another time',
-    unrated: 'unrated'
+    unrated: 'unrated',
+    automaticallyOmitted: 'auto omitted'
 }

@@ -53,14 +53,16 @@ export const getStatistics = async (auth, Database: Connection): Promise<{
     ratedToday: number,
     ratedTracks: number,
     unratedTracks: number,
-    unratedTracksDurationMs: number
+    unratedTracksDurationMs: number,
+    totalTracks: number,
 }> => {
     const TrackRepository = Database.getRepository( TrackEntity )
 
     const {
-        approxTracksCount,
-        approxTracksDurationMs
-    } = await approximateTargetTracksStats( auth, Database )
+        approxUnratedTracksCount,
+        approxUnratedTracksDurationMs,
+        approxTotalTracksCount,
+    } = await approximateUnratedTracksStats( auth, Database )
 
     const ratedTracks = await TrackRepository.count({
         where: { rated: true }
@@ -79,9 +81,10 @@ export const getStatistics = async (auth, Database: Connection): Promise<{
 
     return {
         ratedTracks,
-        unratedTracks: approxTracksCount,
-        unratedTracksDurationMs: approxTracksDurationMs,
-        ratedToday
+        unratedTracks: approxUnratedTracksCount,
+        unratedTracksDurationMs: approxUnratedTracksDurationMs,
+        ratedToday,
+        totalTracks: approxTotalTracksCount,
     }
 }
 
@@ -90,28 +93,32 @@ export const getStatistics = async (auth, Database: Connection): Promise<{
  * 
  * + some other statistics, like total duration.
  */
-const approximateTargetTracksStats = async ( auth, Database: Connection ) => {
+const approximateUnratedTracksStats = async ( auth, Database: Connection ) => {
     // Ensure albums up to date.
     const albums = await updateAlbums(auth, Database)
 
-    let approxTracksCount = 0
-    let approxTracksDurationMs = 0
+    let approxUnratedTracksCount = 0
+    let approxUnratedTracksDurationMs = 0
+    let approxTotalTracksCount = 0
     // Iterate through every album in database.
     for (const album of albums) {
         if (album.tracksListed) {
             // Album tracks have been scraped. Count unrated tracks count.
-            approxTracksCount += (album.tracksCount - album.ratedTracksCount)
+            approxUnratedTracksCount += (album.tracksCount - album.ratedTracksCount)
+            approxTotalTracksCount += album.tracksCount
         } else {
             // Album tracks have NOT been scraped, just go with some rough average assumption.
             const assumedTracksCount = 10
             const assumedTrackDurationMsAvg = 3 * 60 * 1000
-            approxTracksCount += assumedTracksCount
-            approxTracksDurationMs += assumedTracksCount * assumedTrackDurationMsAvg
+            approxUnratedTracksCount += assumedTracksCount
+            approxUnratedTracksDurationMs += assumedTracksCount * assumedTrackDurationMsAvg
+            approxTotalTracksCount += assumedTracksCount
         }
     }
     return {
-        approxTracksCount,
-        approxTracksDurationMs
+        approxUnratedTracksCount,
+        approxUnratedTracksDurationMs,
+        approxTotalTracksCount
     }
 }
 
@@ -146,6 +153,14 @@ export const getRandomUnratedTracks = async (auth, Database: Connection, count: 
             if (!randomTrack) {
                 throw new Error(`'randomTrack' was undefined (album.id: ${randomAlbum.id}, albumTracks.length: ${albumTracks.length})`)
             }
+
+            // Automatic omitting logic.
+            if (randomTrack.name.toLowerCase().includes('live')) {
+                console.log(`\tAuto omitting LIVE track (${randomTrack.name})`)
+                await rateTrack(auth, Database, randomTrack.id, TrackRating.automaticallyOmitted)
+                continue
+            }
+
             randomUnratedTracks.push(randomTrack)
 
         } catch (e) {
@@ -189,7 +204,7 @@ export const getRecentlyPlayedTracks = async (auth, Database: Connection): Promi
     })
 }
 
-export const rateTrack = async (auth, Database: Connection, trackId: number, rating: string) => {
+export const rateTrack = async (auth, Database: Connection, trackId: string, rating: string) => {
     const TrackRepository = Database.getRepository(TrackEntity)
     const AlbumRepository = Database.getRepository(AlbumEntity)
 
@@ -218,7 +233,7 @@ const dayMs = 24 * hourMs
 const weekMs = 7 * dayMs
 const monthMs = 30 * dayMs
 const yearMs = 12 * monthMs
-const parseDurationMs = (durationMs: number): string => {
+export const parseDurationMs = (durationMs: number): string => {
     if (durationMs > 2 * yearMs) return `${(durationMs / yearMs).toFixed(1)} years :D`
     if (durationMs > 2 * monthMs) return `${(durationMs / monthMs).toFixed(1)} months :D`
     if (durationMs > 2 * weekMs) return `${(durationMs / weekMs).toFixed(1)} weeks :3`

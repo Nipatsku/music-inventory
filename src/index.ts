@@ -7,7 +7,7 @@ import * as request from 'request-promise-native'
 import { createConnection } from 'typeorm'
 import { IUserActivePlayback, IUserProfile } from './interfaces';
 import { User } from './entity/User';
-import { doStuff, getRecentlyPlayedTracks, getStatistics, playUnratedTrack, rateTrack } from './logic';
+import { doStuff, getRecentlyPlayedTracks, getStatistics, parseDurationMs, playUnratedTrack, rateTrack } from './logic';
 import Track, { TrackRating } from './entity/Track';
 import { getUserCurrentPlayback } from './spotify/utils';
 
@@ -205,7 +205,6 @@ const getUserProfile = async ( auth ) => {
     doStuff( auth, Database )
 
     const stats = await getStatistics(auth, Database)
-    console.log(stats)
 
     app.get('/play', async function(req, res) {
         try {    
@@ -239,19 +238,26 @@ const getUserProfile = async ( auth ) => {
                     flex-direction: column;
                     text-align: center;
                     overflow-y: auto;
+                    font-size: 3.0vw;
                 }
                 .title-small {
-                    font-size: 8.0vw;
+                    font-size: 6.0vw;
                 }
                 .title-big {
-                    font-size: 10.0vw;
+                    font-size: 8.0vw;
+                }
+                .stats {
+                    display: flex;
+                    flex-direction: column;
+                    margin-top: 3.0em;
                 }
                 .recently-played {
                     margin-top: 20vh;
-                    font-size: 6.0vw;
+                    display: flex;
+                    flex-direction: column;
                 }
                 .rate-button {
-                    font-size: 6.0vw;
+                    font-size: 4.0vw;
                     background-color: rgba(200,200,200);
                     padding: 10px 0px;
                     margin-top: 1.0em;
@@ -263,10 +269,17 @@ const getUserProfile = async ( auth ) => {
             <span class='title-small'>Listening to</span>
             <span class='title-big'><b>${currentPlayback.name}</b></span>
             <span class='title-small'>by ${currentPlayback.artists[0].name}</span>
-            <span class='recently-played'>Recently played:</span>
-            ${recentlyPlayedTracks.map((track, i) => 
-                `<span class='rate-button' onclick='rate(${i})'>${track.name}</span>`
-            ).join('\n')}
+            <div class='stats'>
+                <span>${stats.ratedTracks} / ${stats.totalTracks} tracks rated (${(stats.ratedTracks * 100 / stats.totalTracks).toFixed(2)}%)</span>
+                <span>Unrated tracks duration: ~${parseDurationMs(stats.unratedTracksDurationMs)}</span>
+                <span>Tracks rated today: ${stats.ratedToday}</span>
+            </div>
+            <div class='recently-played'>
+                <span>Recently played:</span>
+                ${recentlyPlayedTracks.map((track, i) => 
+                    `<span class='rate-button' onclick='rate(${i})'>${track.name}</span>`
+                ).join('\n')}
+            </div>
             <script>
                 let rating = false
                 function rate(iTrack) {
@@ -293,6 +306,9 @@ const getUserProfile = async ( auth ) => {
             const trackId = req.url.match(/trackId=([^&/]*)/)[1]
             const rating = TrackRating[req.url.match(/rating=([^&/]*)/)[1]]
             await rateTrack(auth, Database, trackId, rating)
+            stats.ratedToday ++
+            stats.ratedTracks ++
+            stats.unratedTracks --
 
             // Play next track automatically if rating suggests so.
             const shouldPlayNextTrack = [

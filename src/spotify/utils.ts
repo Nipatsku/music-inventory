@@ -253,7 +253,7 @@ export const playTrack = async (auth, trackUri: string, reattempt: number = 0) =
      */
     const TEMP_PLAYLIST = '5sfVal7459RWClfmHNpCiC'
 
-    const TEMP_DEVICE = '4d68f5a85f91a74adc0c85adcc5afae1fe5e26e3'
+    // const TEMP_DEVICE = '4d68f5a85f91a74adc0c85adcc5afae1fe5e26e3'
 
     let statusCode, response
     if (reattempt === 0) {
@@ -281,7 +281,7 @@ export const playTrack = async (auth, trackUri: string, reattempt: number = 0) =
     // PUT https://api.spotify.com/v1/me/player/play
     response = await request({
         method: 'PUT',
-        uri: `https://api.spotify.com/v1/me/player/play?device_id=${TEMP_DEVICE}`,
+        uri: `https://api.spotify.com/v1/me/player/play`,//?device_id=${TEMP_DEVICE}`,
         headers: {
             Authorization: `Bearer ${ access_token }`,
             'Content-Type': 'application/x-www-form-urlencoded',
