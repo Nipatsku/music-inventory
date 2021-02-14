@@ -10,14 +10,21 @@
 
 Make a web app that you can play and rate these with, so you can casually work on this huge project over time.
 
+
+## Migrations
+
+Build first !
+npx typeorm schema:sync -c 'development'
+
+
+
 ## TODOs
 
-- Add visible statistics on project progress to main UI page.
-    * Unrated tracks
-    * Rated tracks
-    * Time spent listening (?)
-    * Tracks rated today
-    * All time record for tracks rated / day
+- Ignore artists:
+    * ennio morricone
+- After confirming it as working, make better version for Hanna to use.
+
+
 - Implement auto play for working days
     * App should automatically play through unrated songs
     * You should be able to rate previously played songs (not just currently playing one)

@@ -209,11 +209,16 @@ const getUserProfile = async ( auth ) => {
     app.get('/play', async function(req, res) {
         try {    
             const track = await playUnratedTrack(auth, Database)
+            if (! track) {
+                throw new Error(`track is undefined`)
+            }
             console.log(`Now playing ${track.name} by ${track.artist.name}`)
             console.log(`Redirecting user to menu`)
             res.redirect(`${BACKEND_URL}/menu?trackId=${track.id}`)
         } catch (e) {
-            console.error(`error: ${e.message}`)
+            console.error(`error couldn't play track (${e.message}), reattempting`)
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            res.redirect(`${BACKEND_URL}/play`)
         }
     })
 
@@ -288,9 +293,6 @@ const getUserProfile = async ( auth ) => {
                     document.body.innerHTML = "<span class='title-small'>Rating <b>"+track.name+"</b> by "+track.artist+"</span>" + ${ratingLabels.map( (rating, i) =>
                         `"<a class='rate-button' href=${`${BACKEND_URL}/rate-track?trackId="+track.id+"&rating=${ratingKeys[i]}`}>${rating}</a>"`
                     ).join(' + ')}
-                    setTimeout(() => {
-                        window.location.reload()
-                    }, 10000)
                 }
                 setTimeout(() => {
                     if (!rating) window.location.reload()
@@ -342,10 +344,16 @@ const getUserProfile = async ( auth ) => {
         // Schedule next recheck.
         res.send(`<html><head><title>Music Inventory - listening to ${currentPlayback.artists[0].name}</title></head><body>
             <h1>Now listening to <b>${currentPlayback.name}</b> by ${currentPlayback.artists[0].name}</h1>
-            <a href=${BACKEND_URL}/play style='font-size: 2.0em'>Skip<a/>
+            <button id='skip' style='font-size: 2.0em'>Skip</button>
             <script>
+                let button = document.getElementById('skip')
+                let skipping = false
+                button.onclick = () => {
+                    skipping = true
+                    document.location.href = "${BACKEND_URL}/play"
+                }
                 setTimeout(() => {
-                    window.location.reload()
+                    if (!skipping) window.location.reload()
                 }, 3000)
             </script>
         </body></html>`)
